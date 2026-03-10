@@ -22,7 +22,10 @@ export function SimpleTable({ headers, rows }: { headers: string[]; rows: ReactN
   );
 }
 
-export function NewButton({ href, label }: { href: string; label: string }) {
+import Link from 'next/link';
+import type { Route } from 'next';
+
+export function NewButton({ href, label }: { href: Route; label: string }) {
   return (
     <Link href={href} className="button">
       {label}
