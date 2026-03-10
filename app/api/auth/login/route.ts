@@ -14,6 +14,13 @@ export async function POST(request: Request) {
     return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(result.message)}&next=${encodeURIComponent(next)}`, request.url));
   }
 
-  await createSessionCookie(result.user);
+  await createSessionCookie({
+  sub: result.user.id,
+  orgId: result.user.orgId,
+  role: result.user.role,
+  email: result.user.email,
+  name: result.user.name,
+  isPlatformAdmin: result.user.isPlatformAdmin,
+});
   return NextResponse.redirect(new URL(next.startsWith('/') ? next : '/', request.url));
 }
