@@ -118,7 +118,9 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Setup route error:', error);
     return NextResponse.json(
-      { error: 'Unexpected setup error.' },
+      {
+        error: error instanceof Error ? error.message : 'Unexpected setup error.',
+      },
       { status: 500 }
     );
   }
