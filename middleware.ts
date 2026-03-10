@@ -2,7 +2,13 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { SESSION_COOKIE } from '@/lib/auth/constants';
 
-const publicPaths = ['/login', '/api/auth/login', '/api/auth/logout'];
+const publicPaths = [
+  '/login',
+  '/setup',
+  '/api/setup',
+  '/api/auth/login',
+  '/api/auth/logout',
+];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -16,7 +22,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const isPublic = publicPaths.some((path) => pathname === path || pathname.startsWith(path + '/'));
+  const isPublic = publicPaths.some(
+    (path) => pathname === path || pathname.startsWith(path + '/')
+  );
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
 
   if (!hasSession && !isPublic) {
@@ -34,5 +42,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!.*\\..*).*)']
+  matcher: ['/((?!.*\\..*).*)'],
 };
