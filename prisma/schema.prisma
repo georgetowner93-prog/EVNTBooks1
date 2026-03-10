@@ -1,0 +1,574 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+  FINANCE
+  READONLY
+}
+
+enum ClientAccountType {
+  INDIVIDUAL
+  COMPANY
+}
+
+enum EnquirySource {
+  WEBSITE
+  PHONE
+  EMAIL
+  INSTAGRAM
+  FACEBOOK
+  REFERRAL
+  MANUAL
+  OTHER
+}
+
+enum EnquiryStatus {
+  NEW
+  CONTACTED
+  QUOTED
+  PENDING
+  CONFIRMED
+  LOST
+  CANCELLED
+}
+
+enum EventStatus {
+  TENTATIVE
+  AWAITING_CONTRACT
+  AWAITING_DEPOSIT
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIAL
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum InvoiceType {
+  DEPOSIT
+  BALANCE
+  STANDARD
+  REFUND
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum ContractStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  DECLINED
+  VOID
+}
+
+enum ExpenseCategory {
+  TRAVEL
+  EQUIPMENT
+  SOFTWARE
+  MARKETING
+  INSURANCE
+  PROFESSIONAL_FEES
+  BANK_FEES
+  OFFICE
+  SUBCONTRACTOR
+  OTHER
+}
+
+enum ExpenseSource {
+  MANUAL
+  BANK_FEED
+}
+
+enum TransactionDirection {
+  MONEY_IN
+  MONEY_OUT
+}
+
+enum TransactionCategory {
+  BOOKING_INCOME
+  TRANSFER
+  SOFTWARE
+  TRAVEL
+  EQUIPMENT
+  INSURANCE
+  BANK_CHARGE
+  MEALS
+  OTHER
+}
+
+enum TaxYearStatus {
+  OPEN
+  READY_FOR_ACCOUNTANT
+  FILED
+}
+
+enum PerformerRole {
+  DJ
+  HOST
+  SAX
+  SINGER
+  MAGICIAN
+  PHOTOGRAPHER
+  TECHNICIAN
+  OTHER
+}
+
+enum PerformerPayoutStatus {
+  PENDING
+  READY
+  APPROVED
+  PAID
+}
+
+enum ReminderChannel {
+  SMS
+  EMAIL
+  NONE
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+
+model Organization {
+  id                     String                  @id @default(cuid())
+  name                   String
+  slug                   String                  @unique
+  email                  String?
+  phone                  String?
+  currency               String                  @default("GBP")
+  timezone               String                  @default("Europe/London")
+  ownerEmail             String?
+  status                 OrganizationStatus      @default(ACTIVE)
+  encryptedDataKey       String?
+  suspendedAt            DateTime?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  users                  User[]
+  clientAccounts         ClientAccount[]
+  enquiries              Enquiry[]
+  events                 Event[]
+  invoices               Invoice[]
+  payments               Payment[]
+  quotes                 Quote[]
+  contracts              Contract[]
+  expenses               Expense[]
+  bankAccounts           BankAccountConnection[]
+  bankTransactions       BankTransaction[]
+  bookingForms           BookingForm[]
+  formSubmissions        BookingFormSubmission[]
+  availabilityBlocks     AvailabilityBlock[]
+  emailTemplates         EmailTemplate[]
+  automationRules        AutomationRule[]
+  taxPeriods             TaxPeriod[]
+  performers             Performer[]
+  performerAssignments   EventPerformerAssignment[]
+  auditLogs              AuditLog[]
+}
+
+model User {
+  id                    String   @id @default(cuid())
+  organizationId        String?
+  organization          Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email                 String   @unique
+  firstName             String
+  lastName              String
+  role                  UserRole @default(ADMIN)
+  passwordHash          String
+  passwordUpdatedAt     DateTime @default(now())
+  twoFactorEnabled      Boolean  @default(false)
+  twoFactorSecretEnc    String?
+  twoFactorRecoveryHash Json?
+  failedLoginAttempts   Int      @default(0)
+  lockedUntil           DateTime?
+  lastLoginAt           DateTime?
+  isActive              Boolean  @default(true)
+  isPlatformAdmin       Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model ClientAccount {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  type           ClientAccountType @default(INDIVIDUAL)
+  displayName    String
+  billingEmail   String?
+  billingPhone   String?
+  notes          String?
+  portalToken    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  enquiries      Enquiry[]
+  events         Event[]
+  invoices       Invoice[]
+  quotes         Quote[]
+  contracts      Contract[]
+  expenses       Expense[]
+}
+
+model Enquiry {
+  id              String         @id @default(cuid())
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientAccountId String?
+  clientAccount   ClientAccount? @relation(fields: [clientAccountId], references: [id], onDelete: SetNull)
+  source          EnquirySource  @default(MANUAL)
+  status          EnquiryStatus  @default(NEW)
+  eventType       String?
+  eventDate       DateTime?
+  guestCount      Int?
+  budgetMax       Float?
+  message         String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model Event {
+  id              String        @id @default(cuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientAccountId String
+  clientAccount   ClientAccount @relation(fields: [clientAccountId], references: [id], onDelete: Cascade)
+  title           String
+  eventType       String?
+  status          EventStatus   @default(TENTATIVE)
+  eventDate       DateTime
+  startTime       String?
+  endTime         String?
+  guestCount      Int?
+  totalPrice      Float         @default(0)
+  balanceDue      Float         @default(0)
+  internalNotes   String?
+  portalVisible   Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  invoices        Invoice[]
+  payments        Payment[]
+  quotes          Quote[]
+  contracts       Contract[]
+  expenses        Expense[]
+  bankTransactions BankTransaction[]
+  performerAssignments EventPerformerAssignment[]
+}
+
+model Invoice {
+  id              String        @id @default(cuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientAccountId String
+  clientAccount   ClientAccount @relation(fields: [clientAccountId], references: [id], onDelete: Cascade)
+  eventId         String?
+  event           Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  invoiceNumber   String
+  type            InvoiceType   @default(STANDARD)
+  status          InvoiceStatus @default(DRAFT)
+  issueDate       DateTime
+  dueDate         DateTime
+  total           Float
+  amountPaid      Float         @default(0)
+  amountDue       Float
+  notes           String?
+  publicPayToken  String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([organizationId, invoiceNumber])
+}
+
+model Payment {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  eventId         String?
+  event           Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  invoiceId       String?
+  amount          Float
+  provider        String       @default("manual")
+  status          String       @default("succeeded")
+  paidAt          DateTime     @default(now())
+  createdAt       DateTime     @default(now())
+}
+
+model Quote {
+  id              String        @id @default(cuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientAccountId String
+  clientAccount   ClientAccount @relation(fields: [clientAccountId], references: [id], onDelete: Cascade)
+  eventId         String?
+  event           Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  quoteNumber     String
+  status          QuoteStatus   @default(DRAFT)
+  validUntil      DateTime?
+  total           Float         @default(0)
+  notes           String?
+  publicToken     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([organizationId, quoteNumber])
+}
+
+model Contract {
+  id              String         @id @default(cuid())
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientAccountId String
+  clientAccount   ClientAccount  @relation(fields: [clientAccountId], references: [id], onDelete: Cascade)
+  eventId         String?
+  event           Event?         @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  contractNumber  String
+  status          ContractStatus @default(DRAFT)
+  title           String
+  body            String
+  acceptedAt      DateTime?
+  publicToken     String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([organizationId, contractNumber])
+}
+
+model Expense {
+  id              String         @id @default(cuid())
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientAccountId String?
+  clientAccount   ClientAccount? @relation(fields: [clientAccountId], references: [id], onDelete: SetNull)
+  eventId         String?
+  event           Event?         @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  description     String
+  category        ExpenseCategory
+  source          ExpenseSource  @default(MANUAL)
+  amount          Float
+  taxAmount       Float          @default(0)
+  expenseDate     DateTime
+  supplier        String?
+  receiptUrl      String?
+  isAllowable     Boolean        @default(true)
+  notes           String?
+  bankTransactionId String?        @unique
+  bankTransaction BankTransaction?  @relation(fields: [bankTransactionId], references: [id], onDelete: SetNull)
+  businessUsePercent Float          @default(100)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model BankAccountConnection {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  providerName    String
+  providerAccountId String? @unique
+  bankName        String
+  accountName     String
+  maskedAccount   String
+  accessTokenEnc  String?
+  refreshTokenEnc String?
+  requisitionId   String?
+  syncCursor      String?
+  consentExpiresAt DateTime?
+  lastSyncedAt    DateTime?
+  status          String       @default("connected")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  transactions    BankTransaction[]
+}
+
+model BankTransaction {
+  id               String               @id @default(cuid())
+  organizationId   String
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  bankAccountId    String
+  bankAccount      BankAccountConnection @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  eventId          String?
+  event            Event?               @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  externalTransactionId String? @unique
+  postedAt         DateTime
+  description      String
+  amount           Float
+  direction        TransactionDirection
+  category         TransactionCategory?
+  merchantName     String?
+  bookingMatchNote String?
+  matchConfidence  Float?
+  counterpartyName String?
+  reviewStatus     String               @default("reviewed")
+  createdAt        DateTime             @default(now())
+  expense          Expense?
+}
+
+model BookingForm {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  slug            String
+  isPublished     Boolean      @default(true)
+  successMessage  String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  submissions     BookingFormSubmission[]
+
+  @@unique([organizationId, slug])
+}
+
+model BookingFormSubmission {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  bookingFormId   String
+  bookingForm     BookingForm  @relation(fields: [bookingFormId], references: [id], onDelete: Cascade)
+  contactName     String
+  email           String
+  phone           String?
+  eventType       String?
+  eventDate       DateTime?
+  message         String?
+  createdAt       DateTime     @default(now())
+}
+
+model AvailabilityBlock {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title           String
+  startsAt        DateTime
+  endsAt          DateTime
+  blockType       String       @default("hold")
+  notes           String?
+  createdAt       DateTime     @default(now())
+}
+
+model EmailTemplate {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  triggerType     String
+  subject         String
+  body            String
+  isEnabled       Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model AutomationRule {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  triggerType     String
+  actionType      String
+  isEnabled       Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+}
+
+model TaxPeriod {
+  id              String          @id @default(cuid())
+  organizationId  String
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  label           String
+  startsOn        DateTime
+  endsOn          DateTime
+  status          TaxYearStatus   @default(OPEN)
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model Performer {
+  id                      String                @id @default(cuid())
+  organizationId          String
+  organization            Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  displayName             String
+  stageName               String?
+  role                    PerformerRole         @default(OTHER)
+  email                   String?
+  phone                   String?
+  defaultFee              Float                 @default(0)
+  defaultTravelFee        Float                 @default(0)
+  notes                   String?
+  bankAccountName         String?
+  bankName                String?
+  bankAccountLast4        String?
+  bankSortCodeLast2       String?
+  payoutReference         String?
+  payoutMethod            String                @default("manual_bank_transfer")
+  canUseOpenBankingPayout Boolean               @default(false)
+  reminderPhone           String?
+  reminderEmail           String?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  assignments             EventPerformerAssignment[]
+}
+
+model EventPerformerAssignment {
+  id                    String                @id @default(cuid())
+  organizationId        String
+  organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  eventId               String
+  event                 Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  performerId           String
+  performer             Performer             @relation(fields: [performerId], references: [id], onDelete: Cascade)
+  roleLabel             String?
+  callTime              String?
+  performanceStart      String?
+  performanceEnd        String?
+  loadInNotes           String?
+  sharedNotes           String?
+  locationSnapshot      String?
+  fee                   Float                 @default(0)
+  travelFee             Float                 @default(0)
+  payoutDueDate         DateTime?
+  payoutStatus          PerformerPayoutStatus @default(PENDING)
+  payoutReminderChannel ReminderChannel       @default(SMS)
+  payoutReminderSentAt  DateTime?
+  payoutApprovedAt      DateTime?
+  paidAt                DateTime?
+  bankPaymentPrepared   Boolean               @default(false)
+  packSentAt            DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  @@unique([eventId, performerId])
+}
+
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actorUserId    String?
+  actorEmail     String?
+  action         String
+  entityType     String
+  entityId       String?
+  ipAddress      String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+}
